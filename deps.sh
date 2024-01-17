@@ -84,7 +84,15 @@ function install_yaffshiv
 function install_sasquatch
 {
     git clone --quiet --depth 1 --branch "master" https://github.com/devttys0/sasquatch
-    (cd sasquatch && $SUDO ./build.sh)
+    (cd sasquatch && \
+    sed -i '/^make/'d build.sh && \
+    ./build.sh && \
+    cd squashfs4.3/squashfs-tools && \
+    sed -i 's/-Wall//' Makefile && \
+    sed -i 's/-Wall//' LZMA/lzmadaptive/C/7zip/Compress/LZMA_Lib/makefile && \
+    sed -i '34c\extern int verbose;' error.h && \
+    sed -i '45a\int verbose;' unsquashfs.c && \
+    make && make install)
     $SUDO rm -rf sasquatch
 }
 
@@ -236,11 +244,11 @@ if [ $? -ne 0 ]
     echo "Package installation failed: $PKG_CANDIDATES"
     exit 1
 fi
-install_pip_package "setuptools matplotlib capstone pycryptodome gnupg tk"
+install_pip_package "setuptools matplotlib capstone pycryptodome gnupg tk ubi_reader"
 install_sasquatch
 install_yaffshiv
 install_jefferson
-install_ubireader
+# install_ubireader
 
 if [ $distro_version = "18" ]
 then

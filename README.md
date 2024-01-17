@@ -1,34 +1,66 @@
-# Binwalk
+# Binwalk_easybuild
 
-[![Build Status](https://travis-ci.org/ReFirmLabs/binwalk.svg?branch=master)](https://travis-ci.org/ReFirmLabs/binwalk)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/ReFirmLabs/binwalk/graphs/commit-activity)
-[![GitHub license](https://img.shields.io/github/license/ReFirmLabs/binwalk.svg)](https://github.com/ReFirmLabs/binwalk/blob/master/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/badges/shields.svg?style=social&label=Stars)](https://github.com/ReFirmLabs/binwalk/stargazers)
+本项的目标是解决在较新的Linux发行版（例如 Debian 12）上安装binwalk的依赖（例如 sasquatch）时报错的问题。
 
-Binwalk is a fast, easy to use tool for analyzing, reverse engineering, and extracting firmware images.
+第一个错误类似下面这样:
+
+```
+cc -g -O2  -I. -I./LZMA/lzma465/C -I./LZMA/lzmalt -I./LZMA/lzmadaptive/C/7zip/Compress/LZMA_Lib -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_GNU_SOURCE -DCOMP_DEFAULT=\"gzip\" -Wall -Werror  -DGZIP_SUPPORT -DLZMA_SUPPORT -DXZ_SUPPORT -DLZO_SUPPORT -DXATTR_SUPPORT -DXATTR_DEFAULT   -c -o unsquashfs.o unsquashfs.c
+unsquashfs.c: In function ‘read_super’:
+unsquashfs.c:1835:5: error: this ‘if’ clause does not guard... [-Werror=misleading-indentation]
+ 1835 |     if(swap)
+      |     ^~
+unsquashfs.c:1841:9: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
+ 1841 |         read_fs_bytes(fd, SQUASHFS_START, sizeof(struct squashfs_super_block),
+      |         ^~~~~~~~~~~~~
+cc1: all warnings being treated as errors
+make: *** [<builtin>: unsquashfs.o] Error 1
+```
+
+关于这个问题，在[这里](https://github.com/devttys0/sasquatch/issues/48)有讨论很多解决方案。但是我认为，问题的本质是编译时使用了`-Wall`选项，将所有的警告都转为了错误，导致编译中断。所以，我的解决方案是去掉`-Wall`选项。
+
+第二个错误类似下面这样：
 
 
-### *** Extraction Security Notice ***
+```
+g++ -O3 -Wall -c  -I ../../../ ZLib.cpp
+In file included from ../LZMA/LZMADecoder.h:6,
+                 from ZLib.cpp:53:
+../LZMA/LZMADecoder.h: In member function ‘virtual ULONG NCompress::NLZMA::CDecoder::Release()’:
+../LZMA/../../../Common/MyCom.h:159:32: warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]
+  159 | STDMETHOD_(ULONG, Release)() { if (--__m_RefCount != 0)  \
+      |                                ^~
+../LZMA/../../../Common/MyCom.h:166:3: note: in expansion of macro ‘MY_ADDREF_RELEASE’
+  166 |   MY_ADDREF_RELEASE
+      |   ^~~~~~~~~~~~~~~~~
+../LZMA/../../../Common/MyCom.h:173:28: note: in expansion of macro ‘MY_UNKNOWN_IMP_SPEC’
+  173 | #define MY_UNKNOWN_IMP1(i) MY_UNKNOWN_IMP_SPEC( \
+      |                            ^~~~~~~~~~~~~~~~~~~
+../LZMA/LZMADecoder.h:196:3: note: in expansion of macro ‘MY_UNKNOWN_IMP1’
+  196 |   MY_UNKNOWN_IMP1(
+      |   ^~~~~~~~~~~~~~~
+../LZMA/../../../Common/MyCom.h:160:24: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
+  160 |   return __m_RefCount; delete this; return 0; }
+```
 
-Prior to Binwalk v2.3.3, extracted archives could create symlinks which point anywhere on the file system, potentially resulting in a directory traversal attack if subsequent extraction utilties blindly follow these symlinks. More generically, Binwalk makes use of many third-party extraction utilties which may have unpatched security issues; Binwalk v2.3.3 and later allows external extraction tools to be run as an unprivileged user using the `run-as` command line option (this requires Binwalk itself to be run with root privileges). Additionally, Binwalk v2.3.3 and later will refuse to perform extraction as root unless `--run-as=root` is specified.
+这个问题与第一个问题一样，也是通过去掉`-Wall`选项解决。
 
 
-### *** Python 2.7 Deprecation Notice ***
+第三个错误类似下面这样：
 
-Even though many major Linux distros are still shipping Python 2.7 as the default interpreter in their currently stable release, we are making the difficult decision to move binwalk support exclusively to Python 3. This is likely to make many upset and others rejoice. If you need to install binwalk into a Python 2.7 environment we will be creating a tag `python27` that will be a snapshot of `master` before all of these major changes are made. Thank you for being patient with us through this transition process.
+```
+g++   ./LZMA/lzmalt/*.o unsquashfs.o unsquash-1.o unsquash-2.o unsquash-3.o unsquash-4.o swap.o compressor.o unsquashfs_info.o gzip_wrapper.o lzma_wrapper.o ./LZMA/lzma465/C/Alloc.o ./LZMA/lzma465/C/LzFind.o ./LZMA/lzma465/C/LzmaDec.o ./LZMA/lzma465/C/LzmaEnc.o ./LZMA/lzma465/C/LzmaLib.o xz_wrapper.o lzo_wrapper.o read_xattrs.o unsquashfs_xattr.o -lpthread -lm -lz -L./LZMA/lzmadaptive/C/7zip/Compress/LZMA_Lib -llzmalib  -llzma  -llzo2 -o sasquatch
+/usr/bin/ld: unsquash-1.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: multiple definition of `verbose'; unsquashfs.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: first defined here
+/usr/bin/ld: unsquash-2.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: multiple definition of `verbose'; unsquashfs.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: first defined here
+/usr/bin/ld: unsquash-3.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: multiple definition of `verbose'; unsquashfs.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: first defined here
+/usr/bin/ld: unsquash-4.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: multiple definition of `verbose'; unsquashfs.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: first defined here
+/usr/bin/ld: compressor.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: multiple definition of `verbose'; unsquashfs.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: first defined here
+/usr/bin/ld: unsquashfs_info.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: multiple definition of `verbose'; unsquashfs.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: first defined here
+/usr/bin/ld: lzma_wrapper.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: multiple definition of `verbose'; unsquashfs.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: first defined here
+/usr/bin/ld: read_xattrs.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: multiple definition of `verbose'; unsquashfs.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: first defined here
+/usr/bin/ld: unsquashfs_xattr.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: multiple definition of `verbose'; unsquashfs.o:/tmp/sasquatch/squashfs4.3/squashfs-tools/error.h:34: first defined here
+collect2: error: ld returned 1 exit status
+make: *** [Makefile:298: sasquatch] Error 1
+```
 
-
-### Installation and Usage
-
-* [Installation](./INSTALL.md)
-* [API](./API.md)
-* [Supported Platforms](https://github.com/ReFirmLabs/binwalk/wiki/Supported-Platforms)
-* [Getting Started](https://github.com/ReFirmLabs/binwalk/wiki/Quick-Start-Guide)
-* [Binwalk Command Line Usage](https://github.com/ReFirmLabs/binwalk/wiki/Usage)
-* [Binwalk IDA Plugin Usage](https://github.com/ReFirmLabs/binwalk/wiki/Creating-Custom-Plugins)
-
-More information on [Wiki](https://github.com/ReFirmLabs/binwalk/wiki)
-
-# Binwalk Professional Edition
-
-After years of developing and supporting binwalk as an open source project we have finally sold out to the man and released a cloud-based firmware extraction engine called *Binwalk Enterprise*. After all someone needs to pay devttys0 so he can buy more milling equipment and feed his children (in that order). Please consider subscribing and reap the benefits of getting actual customer support for all your firmware extraction and analysis needs. Please visit https://www.refirmlabs.com/binwalk-enterprise/ for more information. 
+这个问题在[这里](https://github.com/devttys0/sasquatch/issues/36)有解释和解决方案，我这里采用了[@mzpqnxow](https://github.com/devttys0/sasquatch/pull/46)的方法。
